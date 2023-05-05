@@ -7,7 +7,7 @@ spark.conf.set("fs.azure.account.key.interactive0d0v.dfs.core.windows.net", acc_
 # COMMAND ----------
 
 # DBTITLE 1,Reading the csv
-df=spark.read.format('csv').option('header', "True").load('abfss://covid-data-raw@interactive0d0v.dfs.core.windows.net/covid_vaccine_statewise.csv')
+df=spark.read.format('csv').option('header', "True").load('abfss://covid-semi-cleaned@interactive0d0v.dfs.core.windows.net/part-00000-bb309251-8451-45a2-b80c-675daa9befc6-c000.csv')
 
 # COMMAND ----------
 
@@ -15,6 +15,62 @@ df=spark.read.format('csv').option('header', "True").load('abfss://covid-data-ra
 display(df)
 
 # COMMAND ----------
+
+# DBTITLE 1,Removing spaces from column name
+from pyspark.sql.functions import col, cast
+df = df.withColumnRenamed('Updated_On', 'Updated On')
+df = df.withColumnRenamed('Total Individuals Vaccinated', 'Total_Individuals_Vaccinated')
+df = df.withColumnRenamed(' Covaxin_dose', 'Covaxin_dose')
+
+df = df.withColumn('Total_doses', col('Total_doses').cast('int'))\
+        .withColumn('Total_Individuals_Vaccinated', col('Total_Individuals_Vaccinated').cast('int'))\
+        .withColumn('Covaxin_dose', col('Covaxin_dose').cast('int'))\
+        .withColumn('CoviShield_dose', col('CoviShield_dose').cast('int'))
+
+
+
+
+
+df.printSchema()
+
+
+
+# COMMAND ----------
+
+display(df)
+
+# COMMAND ----------
+
+df = df.fillna(0, ['Covaxin_dose', 'CoviShield_dose'])
+
+
+# COMMAND ----------
+
+display(df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Creating data frame for vaccination type recored
+from pyspark.sql.functions import udf, sum
+from pyspark.sql.types import IntegerType
+
+temp_vaccine = df.select( sum(df.Covaxin_dose).alias('Covax'), sum(df.CoviShield_dose).alias('CoviShield') )
+
+def give_percentage(number, total):
+    percentage = (number * 100)/total;
+    return ("%.2f" % percentage)
+
+def calculate_percentage(column):
+    total = column[0]+column[1]
+    covax = give_percentage(column[0], total)
+    covi = give_percentage(column[1], total)
+    return (covax, covi)
+
+rdd1 = temp_vaccine.rdd.map( lambda column : calculate_percentage(column) )
+
+vaccine_data_frame = rdd1.toDF(['Covax', 'CoviShield'])
+
+display(vaccine_data_frame)
 
 
 
