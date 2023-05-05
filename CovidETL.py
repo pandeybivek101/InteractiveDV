@@ -11,14 +11,10 @@ df=spark.read.format('csv').option('header', "True").load('abfss://covid-semi-cl
 
 # COMMAND ----------
 
-# DBTITLE 1,Displaying Dataframe
-display(df)
-
-# COMMAND ----------
-
 # DBTITLE 1,Removing spaces from column name
 from pyspark.sql.functions import col, cast
-df = df.withColumnRenamed('Updated_On', 'Updated On')
+
+df = df.withColumnRenamed('Updated On', 'Updated_On')
 df = df.withColumnRenamed('Total Individuals Vaccinated', 'Total_Individuals_Vaccinated')
 df = df.withColumnRenamed(' Covaxin_dose', 'Covaxin_dose')
 
@@ -27,20 +23,25 @@ df = df.withColumn('Total_doses', col('Total_doses').cast('int'))\
         .withColumn('Covaxin_dose', col('Covaxin_dose').cast('int'))\
         .withColumn('CoviShield_dose', col('CoviShield_dose').cast('int'))
 
+# COMMAND ----------
 
+# DBTITLE 1,getting data from latest date for each states
 
+from pyspark.sql.functions import date_format, to_date, col
+handeled_tottal_vaccine_df = df.withColumn('Total_Individuals_Vaccinated', col('Covaxin_dose')+col('CoviShield_dose'))
+handeled_tottal_vaccine_latest_date = handeled_tottal_vaccine_df.tail(73)
 
-
-df.printSchema()
-
+df = spark.createDataFrame(handeled_tottal_vaccine_latest_date)
 
 
 # COMMAND ----------
 
+# DBTITLE 1,Displaying Dataframe
 display(df)
 
 # COMMAND ----------
 
+# DBTITLE 1,Filling null values
 df = df.fillna(0, ['Covaxin_dose', 'CoviShield_dose'])
 
 
@@ -76,10 +77,6 @@ vaccine_data_frame.show()
 
 # COMMAND ----------
 
-display(df)
-
-# COMMAND ----------
-
 # DBTITLE 1,Data Frame for total vaccinated by genderwise in each state
 df = df.withColumn('Male_dose', col('Male_dose').cast('int')).withColumn('Female_dose', col('Female_dose').cast('int'))
 
@@ -89,11 +86,14 @@ Total_gender_doses = df.groupBy('State').agg(
 )
 display(Total_gender_doses)
 
-
 # COMMAND ----------
 
 # DBTITLE 1,Total Vaccine Distribution Sate Wise
-total_vaccinated_df = df.groupBy('State').sum('Total_Individuals_Vaccinated')
+
+total_vaccinated_df = df.groupBy('State').agg(
+    sum('Total_Individuals_Vaccinated').alias('Total_doses')
+)
+
 display(total_vaccinated_df)
 
 
