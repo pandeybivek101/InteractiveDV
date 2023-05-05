@@ -92,4 +92,11 @@ display(Total_gender_doses)
 
 # COMMAND ----------
 
+# DBTITLE 1,Total Vaccine Distribution Sate Wise
+total_vaccinated_df = df.groupBy('State').sum('Total_Individuals_Vaccinated')
+display(total_vaccinated_df)
+
+
+# COMMAND ----------
+
 
