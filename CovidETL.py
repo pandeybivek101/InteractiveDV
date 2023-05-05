@@ -70,8 +70,24 @@ rdd1 = temp_vaccine.rdd.map( lambda column : calculate_percentage(column) )
 
 vaccine_data_frame = rdd1.toDF(['Covax', 'CoviShield'])
 
-display(vaccine_data_frame)
+vaccine_data_frame.show()
 
+
+
+# COMMAND ----------
+
+display(df)
+
+# COMMAND ----------
+
+# DBTITLE 1,Data Frame for total vaccinated by genderwise in each state
+df = df.withColumn('Male_dose', col('Male_dose').cast('int')).withColumn('Female_dose', col('Female_dose').cast('int'))
+
+Total_gender_doses = df.groupBy('State').agg(
+    sum('Male_dose').alias('Male_Doses'),
+    sum('Female_dose').alias("Female_Doses")
+)
+display(Total_gender_doses)
 
 
 # COMMAND ----------
