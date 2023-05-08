@@ -76,6 +76,7 @@ vaccine_data_frame.show()
 
 
 
+
 # COMMAND ----------
 
 # DBTITLE 1,Data Frame for total vaccinated by genderwise in each state
@@ -86,6 +87,8 @@ Total_gender_doses = df.groupBy('State').agg(
     sum('Female_dose').alias("Female_Doses")
 )
 display(Total_gender_doses)
+
+
 
 # COMMAND ----------
 
@@ -134,7 +137,7 @@ total_population['Puducherry'] = 1247953
 total_population['Mizoram'] = 1097206
 total_population['Chandigarh'] = 1055450
 total_population['Sikkim'] = 610577
-total_population['Dadra and Nagar Haveli and Daman and Diu'] = 585764
+total_population['Dadra and Nagar Haveli and Daman and Diu'] = 785764
 total_population['Andaman and Nicobar Islands'] = 380581
 total_population['Ladakh'] = 274000
 total_population['Lakshadweep'] = 64473
@@ -145,19 +148,99 @@ total_population['India'] = 1630569573
 
 # DBTITLE 1,Vaccinated Percentage in each state
 from pyspark.sql.functions import transform, udf, cast
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StringType, FloatType
 
-@udf(returnType=StringType())
+@udf(returnType=IntegerType())
 def get_state_total_population(state):
     return total_population[state] if state in total_population.keys() else None
 
-state_percent_df = total_vaccinated_df.select(\
+
+@udf(returnType=StringType())
+def get_percentage(doses, total):
+    if total is not None:
+        percentage = ( int(doses) * 100 )/total;
+        return ("%.2f" % percentage)
+    else:
+        return None
+
+    
+
+state_without_per_df = total_vaccinated_df.select(\
     total_vaccinated_df.State,\
     total_vaccinated_df.Total_doses,\
-    get_state_total_population( total_vaccinated_df.State ).alias('Total Population')
+    get_state_total_population( total_vaccinated_df.State ).alias('Total_Population'),\
     )
 
-display( state_percent_df )
+state_without_per_df.withColumn('Total_doses', state_without_per_df.Total_doses.cast('int'))
+
+
+
+
+state_with_per_df = state_without_per_df.select(\
+    state_without_per_df.State,\
+    state_without_per_df.Total_doses,\
+    state_without_per_df.Total_Population,\
+    get_percentage( state_without_per_df.Total_doses, state_without_per_df.Total_Population ).alias('Vaccinated_Percentage')
+
+    )
+
+display(state_with_per_df)
+
+state_without_per_df.printSchema()
+
+
+# COMMAND ----------
+
+#visualization
+import matplotlib
+import matplotlib.pyplot as plt
+%matplotlib inline 
+
+
+# COMMAND ----------
+
+
+total_vaccinated_df_pandas = total_vaccinated_df.toPandas()
+total_vaccinated_df_pandas.plot(kind='bar',y='Total_doses',x='State', color = "#4CAF50", width=1)
+
+# COMMAND ----------
+
+Total_gender_doses_cleaned = Total_gender_doses.withColumn('Male_Doses', col('Male_Doses'). cast('int'))\
+    .withColumn('Female_Doses', col('Female_Doses'). cast('int'))
+
+
+
+
+Total_gender_doses_cleaned_pandas = Total_gender_doses_cleaned.toPandas()
+
+# COMMAND ----------
+
+N = 3
+ind = np.arange(len(Total_gender_doses_cleaned_pandas.State)) 
+width = 0.25
+
+bar1 = plt.bar(ind, Total_gender_doses_cleaned_pandas.Male_Doses, width, color = 'r')
+bar2 = plt.bar(ind+width, Total_gender_doses_cleaned_pandas.Female_Doses, width, color='g')
+plt.xlabel("States")
+plt.ylabel('Gender')
+plt.title("Gender wise Vaccination ratio in each state")
+plt.xticks(ind+width,Total_gender_doses_cleaned_pandas.State)
+plt.legend( (bar1, bar2), ('Male', 'Female' ) )
+plt.show()
+
+# COMMAND ----------
+
+from pyspark.sql.functions import collect_list
+vaccine_data_frame_cleaned = vaccine_data_frame.withColumn('Covax', col('Covax').cast('int'))\
+    .withColumn('CoviShield', col('CoviShield').cast('int'))
+
+
+y = [10, 20]
+mylabels = ["Covaxin", "Covishield"]
+plt.pie(y, labels = mylabels)
+plt.show() 
+
+
 
 
 # COMMAND ----------
