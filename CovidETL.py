@@ -40,6 +40,9 @@ df = df.dropDuplicates(['State'])
 # DBTITLE 1,Displaying Dataframe
 display(df)
 
+
+
+
 # COMMAND ----------
 
 # DBTITLE 1,Filling null values
@@ -112,6 +115,7 @@ total_population['West Bengal'] = 91276115
 total_population['Madhya Pradesh'] = 72626809
 total_population['Tamil Nadu'] = 72147030
 total_population['Rajasthan'] = 68548437
+total_population['Delhi'] = 32941000
 total_population['Karnataka'] = 61095297
 total_population['Gujarat'] = 60439692
 total_population['Andhra Pradesh'] = 49577103
@@ -136,17 +140,18 @@ total_population['Arunachal Pradesh'] = 1383727
 total_population['Puducherry'] = 1247953
 total_population['Mizoram'] = 1097206
 total_population['Chandigarh'] = 1055450
-total_population['Sikkim'] = 610577
+total_population['Sikkim'] = 700577
 total_population['Dadra and Nagar Haveli and Daman and Diu'] = 785764
 total_population['Andaman and Nicobar Islands'] = 380581
 total_population['Ladakh'] = 274000
-total_population['Lakshadweep'] = 64473
+total_population['Lakshadweep'] = 75473
 total_population['India'] = 1630569573
 
 
 # COMMAND ----------
 
 # DBTITLE 1,Vaccinated Percentage in each state
+
 from pyspark.sql.functions import transform, udf, cast
 from pyspark.sql.types import StringType, FloatType
 
@@ -192,16 +197,30 @@ state_without_per_df.printSchema()
 # COMMAND ----------
 
 #visualization
+
 import matplotlib
 import matplotlib.pyplot as plt
+from mpl_interactions import ioff, panhandler, zoom_factory
 %matplotlib inline 
+
+import matplotlib.ticker as ticker
+
+
 
 
 # COMMAND ----------
 
 
 total_vaccinated_df_pandas = total_vaccinated_df.toPandas()
-total_vaccinated_df_pandas.plot(kind='bar',y='Total_doses',x='State', color = "#4CAF50", width=1)
+
+total_vaccinated_df_pandas.plot(kind='bar',y='Total_doses',x='State', color = "#4CAF50", width=0.8, title="Number of vaccinated person in each state")
+
+  
+fig = plt.figure(figsize = (30, 5))
+
+ 
+# creating the bar plot
+
 
 # COMMAND ----------
 
@@ -215,17 +234,27 @@ Total_gender_doses_cleaned_pandas = Total_gender_doses_cleaned.toPandas()
 
 # COMMAND ----------
 
+import numpy as np
+
+
+
+
 N = 3
 ind = np.arange(len(Total_gender_doses_cleaned_pandas.State)) 
 width = 0.25
-
+plt.rcParams['figure.figsize'] = [20, 10]
 bar1 = plt.bar(ind, Total_gender_doses_cleaned_pandas.Male_Doses, width, color = 'r')
 bar2 = plt.bar(ind+width, Total_gender_doses_cleaned_pandas.Female_Doses, width, color='g')
 plt.xlabel("States")
 plt.ylabel('Gender')
 plt.title("Gender wise Vaccination ratio in each state")
 plt.xticks(ind+width,Total_gender_doses_cleaned_pandas.State)
+plt.xticks(rotation=90)
+
 plt.legend( (bar1, bar2), ('Male', 'Female' ) )
+
+
+
 plt.show()
 
 # COMMAND ----------
@@ -234,13 +263,68 @@ from pyspark.sql.functions import collect_list
 vaccine_data_frame_cleaned = vaccine_data_frame.withColumn('Covax', col('Covax').cast('int'))\
     .withColumn('CoviShield', col('CoviShield').cast('int'))
 
-
-y = [10, 20]
+x = [vaccine_data_frame_cleaned.collect()[0][0], vaccine_data_frame_cleaned.collect()[0][1]]
 mylabels = ["Covaxin", "Covishield"]
-plt.pie(y, labels = mylabels)
+plt.figure(figsize=(8,8))
+plt.pie(x, labels = mylabels, autopct='%1.2f%%')
+
+plt.title(
+    label="Vaccine Distribution Percentage by Vaccine Type", 
+)
 plt.show() 
 
 
+
+
+# COMMAND ----------
+
+
+import pandas as pd
+import geopandas as gpd
+import shapefile as shp
+import seaborn as sns
+from shapely.geometry import Point
+
+pd.set_option('display.max_columns', None)  
+shp_gdf = gpd.read_file('/dbfs/FileStore/India_State_Boundary.shp')
+
+@udf(returnType=StringType())
+def adjust_state_name(state):
+    if state == "Andaman and Nicobar Islands":
+        return 'Andaman & Nicobar'
+    elif state == "Chhattisgarh":
+        return 'Chhattishgarh'
+    elif state == "Dadra and Nagar Haveli and Daman and Diu":
+        return 'Daman and Diu and Dadra and Nagar Haveli'
+    elif state == 'Tamil Nadu':
+        return 'Tamilnadu'
+    elif state == 'Telangana':
+        return 'Telengana'
+    else:
+        return state
+
+
+state_with_per_up_df = state_with_per_df.withColumn('State', adjust_state_name(state_with_per_df.State))
+
+df = state_with_per_up_df.toPandas()
+
+
+merged = shp_gdf.set_index('State_Name').join(df.set_index('State'))
+merged.head()
+
+
+
+
+
+
+
+# COMMAND ----------
+
+fig, ax = plt.subplots(1, figsize=(12, 12))
+ax.axis('off')
+ax.set_title('Covid Vaccinated percentage state wise',
+             fontdict={'fontsize': '15', 'fontweight' : '3'})
+fig = merged.plot(column='Vaccinated_Percentage', cmap='RdYlGn', linewidth=0.5, ax=ax, edgecolor='0.2',legend=True)
 
 
 # COMMAND ----------
