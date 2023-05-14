@@ -33,6 +33,7 @@ handeled_tottal_vaccine_latest_date = handeled_tottal_vaccine_df.tail(73)
 
 df = spark.createDataFrame(handeled_tottal_vaccine_latest_date)
 df = df.dropDuplicates(['State'])
+df = df.where(df.State != 'India')
 
 
 # COMMAND ----------
@@ -50,6 +51,7 @@ df = df.fillna(0, ['Covaxin_dose', 'CoviShield_dose'])
 
 
 # COMMAND ----------
+
 
 display(df)
 
@@ -200,7 +202,7 @@ state_without_per_df.printSchema()
 
 import matplotlib
 import matplotlib.pyplot as plt
-from mpl_interactions import ioff, panhandler, zoom_factory
+
 %matplotlib inline 
 
 import matplotlib.ticker as ticker
@@ -210,14 +212,30 @@ import matplotlib.ticker as ticker
 
 # COMMAND ----------
 
+# DBTITLE 1,Statewise total vaccine distribution visualization
 
 total_vaccinated_df_pandas = total_vaccinated_df.toPandas()
 
-total_vaccinated_df_pandas.plot(kind='bar',y='Total_doses',x='State', color = "#4CAF50", width=0.8, title="Number of vaccinated person in each state")
+# total_vaccinated_df_pandas.plot(kind='bar',y='Total_doses',x='State', color = "#4CAF50", width=0.8, title="Number of vaccinated person in each state")
 
-  
-fig = plt.figure(figsize = (30, 5))
+# plt.ylabel('Vaccinated Population')
+# # fig = plt.figure(figsize = (30, 5))
 
+
+
+ind = np.arange(len(Total_gender_doses_cleaned_pandas.State)) 
+width = 0.35
+plt.rcParams['figure.figsize'] = [20, 10]
+bar1 = plt.bar(ind, total_vaccinated_df_pandas.Total_doses, width, color = '#4CAF50')
+plt.xlabel("States")
+plt.ylabel('Vaccinated Population')
+plt.title("Number of vaccinated person in each state")
+plt.xticks(ind+width,total_vaccinated_df_pandas.State)
+plt.xticks(rotation=90)
+
+plt.gcf().axes[0].yaxis.get_major_formatter().set_scientific(False)
+fig = plt.figure(figsize = (30, 49))
+plt.show()
  
 # creating the bar plot
 
@@ -234,6 +252,7 @@ Total_gender_doses_cleaned_pandas = Total_gender_doses_cleaned.toPandas()
 
 # COMMAND ----------
 
+# DBTITLE 1,Statewise total vaccine distribution based on gender visualization
 import numpy as np
 
 
@@ -246,19 +265,20 @@ plt.rcParams['figure.figsize'] = [20, 10]
 bar1 = plt.bar(ind, Total_gender_doses_cleaned_pandas.Male_Doses, width, color = 'r')
 bar2 = plt.bar(ind+width, Total_gender_doses_cleaned_pandas.Female_Doses, width, color='g')
 plt.xlabel("States")
-plt.ylabel('Gender')
+plt.ylabel('Vaccinated Population')
 plt.title("Gender wise Vaccination ratio in each state")
 plt.xticks(ind+width,Total_gender_doses_cleaned_pandas.State)
 plt.xticks(rotation=90)
-
 plt.legend( (bar1, bar2), ('Male', 'Female' ) )
-
+plt.gcf().axes[0].yaxis.get_major_formatter().set_scientific(False)
+ 
 
 
 plt.show()
 
 # COMMAND ----------
 
+# DBTITLE 1,Statewise total vaccine distribution percentage based on vaccine type visualization
 from pyspark.sql.functions import collect_list
 vaccine_data_frame_cleaned = vaccine_data_frame.withColumn('Covax', col('Covax').cast('int'))\
     .withColumn('CoviShield', col('CoviShield').cast('int'))
@@ -271,12 +291,14 @@ plt.pie(x, labels = mylabels, autopct='%1.2f%%')
 plt.title(
     label="Vaccine Distribution Percentage by Vaccine Type", 
 )
+
 plt.show() 
 
 
 
 
 # COMMAND ----------
+
 
 
 import pandas as pd
@@ -305,12 +327,14 @@ def adjust_state_name(state):
 
 
 state_with_per_up_df = state_with_per_df.withColumn('State', adjust_state_name(state_with_per_df.State))
+state_with_per_up_df = state_with_per_up_df.withColumn('State_name', adjust_state_name(state_with_per_up_df.State))
 
 df = state_with_per_up_df.toPandas()
 
 
 merged = shp_gdf.set_index('State_Name').join(df.set_index('State'))
-merged.head()
+
+display(merged)
 
 
 
@@ -320,11 +344,18 @@ merged.head()
 
 # COMMAND ----------
 
-fig, ax = plt.subplots(1, figsize=(12, 12))
+# DBTITLE 1,Projected Severity based on vaccination percentage in each state
+fig, ax = plt.subplots(1, figsize=(18, 18))
 ax.axis('off')
 ax.set_title('Covid Vaccinated percentage state wise',
              fontdict={'fontsize': '15', 'fontweight' : '3'})
-fig = merged.plot(column='Vaccinated_Percentage', cmap='RdYlGn', linewidth=0.5, ax=ax, edgecolor='0.2',legend=True)
+
+fig = merged.plot(column='Vaccinated_Percentage', cmap='RdYlGn',categorical=True, linewidth=0.5, ax=ax, edgecolor='0.2',legend=True)
+
+# Add state name annotations to the map
+for _, row in merged.iterrows():
+    ax.annotate(text=row['State_name'], xy=row['geometry'].centroid.coords[0], 
+                horizontalalignment='center', verticalalignment='center', fontsize=10, color='black')
 
 
 # COMMAND ----------
